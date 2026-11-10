@@ -1,6 +1,7 @@
 package com.manhwareader
 
 import android.app.Application
+import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,8 +24,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var scanning by mutableStateOf(false)
         private set
-    var hasFolder by mutableStateOf(prefs.treeUri != null)
+    var folders by mutableStateOf(prefs.trees)
         private set
+    val hasFolder: Boolean get() = folders.isNotEmpty()
     /** (chapters checked so far, total) while the reader is being prepared. */
     var preparing by mutableStateOf<Pair<Int, Int>?>(null)
         private set
@@ -47,25 +49,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun onFolderPicked(uri: Uri) {
-        prefs.treeUri = uri
-        hasFolder = true
-        updateSelected(emptySet())
-        chapters = emptyList()
-        series = emptyList()
-        openName = null
+        // Adds to the folders already there instead of replacing them.
+        if (uri !in prefs.trees) {
+            prefs.trees = prefs.trees + uri
+            folders = prefs.trees
+        }
         rescan()
     }
 
     fun rescan() {
-        val tree = prefs.treeUri ?: return
+        val trees = prefs.trees
         scanJob?.cancel()
+        if (trees.isEmpty()) {
+            chapters = emptyList()
+            series = emptyList()
+            openName = null
+            updateSelected(emptySet())
+            scanning = false
+            return
+        }
         scanJob = viewModelScope.launch {
             scanning = true
             try {
                 val found = withContext(Dispatchers.IO) {
-                    runCatching { LibraryScanner.scan(getApplication<Application>(), tree) }
+                    runCatching { scanAll(trees) }
                 }
-                found.onSuccess { data ->
+                found.onSuccess { (data, failed) ->
                     val list = data.chapters
                     chapters = list
                     series = list.groupBy { it.series }
@@ -73,7 +82,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     if (series.none { it.name == openName }) openName = null
                     val saved = prefs.selection
                     selected = list.map { it.uri }.filter { it.toString() in saved }.toSet()
-                    if (list.isEmpty()) message = "No PDF files found in that folder."
+                    if (failed > 0) {
+                        message = "$failed folder(s) couldn't be opened. Remove them and add them again."
+                    } else if (list.isEmpty()) {
+                        message = "No PDF files found in your folders."
+                    }
                 }.onFailure {
                     message = "Can't open that folder. Please pick it again."
                 }
@@ -81,6 +94,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 scanning = false
             }
         }
+    }
+
+    /** Scans every added folder and merges the results. Returns the library and how many folders failed. */
+    private fun scanAll(trees: List<Uri>): Pair<LibraryData, Int> {
+        val app = getApplication<Application>()
+        val all = ArrayList<Chapter>()
+        val covers = HashMap<String, Uri>()
+        var failed = 0
+        for (t in trees) {
+            val r = runCatching { LibraryScanner.scan(app, t) }.getOrNull()
+            if (r == null) {
+                failed++
+            } else {
+                all += r.chapters
+                for ((name, cover) in r.covers) if (name !in covers) covers[name] = cover
+            }
+        }
+        if (failed == trees.size) throw IllegalStateException("No folder could be opened")
+        return LibraryData(all.sortedWith(LibraryScanner.ORDER), covers) to failed
+    }
+
+    fun removeFolder(uri: Uri) {
+        runCatching {
+            getApplication<Application>().contentResolver
+                .releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        prefs.trees = prefs.trees - uri
+        folders = prefs.trees
+        rescan()
     }
 
     private fun updateSelected(set: Set<Uri>) {

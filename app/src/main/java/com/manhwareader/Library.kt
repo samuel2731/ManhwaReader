@@ -95,6 +95,12 @@ fun formatSize(bytes: Long): String = when {
 object LibraryScanner {
     private const val PDF_MIME = "application/pdf"
 
+    /** Library order: by manhwa name, then by chapter path (numbers sorted naturally). */
+    val ORDER = Comparator<Chapter> { a, b ->
+        val s = compareNatural(a.series, b.series)
+        if (s != 0) s else compareNatural(a.sortKey, b.sortKey)
+    }
+
     /**
      * Walks the picked folder (and all subfolders) and returns every PDF.
      * Top-level subfolders become "series"; PDFs directly in the folder go under the folder's own name.
@@ -121,6 +127,19 @@ object LibraryScanner {
             val cursor = runCatching { resolver.query(childrenUri, columns, null, null, null) }.getOrNull()
                 ?: return
             cursor.use { c ->
+                // If the folder you added has PDFs directly inside, it is one manhwa
+                // (subfolders like "Season 1" stay part of it). Otherwise each subfolder is its own manhwa.
+                var hasPdfHere = false
+                if (depth == 0) {
+                    while (c.moveToNext()) {
+                        val n = c.getString(1)
+                        val m = c.getString(2) ?: ""
+                        if (n != null && m != DocumentsContract.Document.MIME_TYPE_DIR &&
+                            (m == PDF_MIME || n.endsWith(".pdf", ignoreCase = true))
+                        ) hasPdfHere = true
+                    }
+                    c.moveToPosition(-1)
+                }
                 while (c.moveToNext()) {
                     val id = c.getString(0)
                     val name = c.getString(1)
@@ -130,7 +149,7 @@ object LibraryScanner {
                     val modified = if (c.isNull(4)) 0L else c.getLong(4)
                     val rel = if (path.isEmpty()) name else "$path/$name"
                     if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
-                        walk(id, if (depth == 0) name else series, rel, depth + 1)
+                        walk(id, if (depth == 0 && !hasPdfHere) name else series, rel, depth + 1)
                     } else if (mime == PDF_MIME || name.endsWith(".pdf", ignoreCase = true)) {
                         out += Chapter(
                             uri = DocumentsContract.buildDocumentUriUsingTree(tree, id),
@@ -154,11 +173,7 @@ object LibraryScanner {
 
         walk(rootId, rootName, "", 0)
 
-        val sorted = out.sortedWith(Comparator { a, b ->
-            val s = compareNatural(a.series, b.series)
-            if (s != 0) s else compareNatural(a.sortKey, b.sortKey)
-        })
-        return LibraryData(sorted, covers)
+        return LibraryData(out.sortedWith(ORDER), covers)
     }
 
     private fun isImage(mime: String, name: String): Boolean {

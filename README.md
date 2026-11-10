@@ -12,7 +12,12 @@ Offline manhwa reader for PDF chapters. No internet needed, no ads, nothing leav
 
 ## Folder layout
 
-Pick one main folder. Put each manhwa in its own subfolder:
+Tap **Folders** on the home screen to add as many folders as you like. They all show together.
+
+- Add a folder that has PDFs directly inside: it is **one manhwa**, named after the folder. Subfolders such as "Season 1" stay part of it.
+- Add a folder that only has subfolders: each subfolder is its **own manhwa**.
+
+Example of the second kind:
 
 ```
 Manhwa/

@@ -7,10 +7,19 @@ import android.net.Uri
 class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("manhwa_reader", Context.MODE_PRIVATE)
 
-    var treeUri: Uri?
-        get() = sp.getString("tree", null)?.let { Uri.parse(it) }
+    /** Every folder the user has added. */
+    var trees: List<Uri>
+        get() {
+            val raw = sp.getString("trees", null)
+            if (raw == null) {
+                // Older versions stored a single folder.
+                val old = sp.getString("tree", null)
+                return if (old != null) listOf(Uri.parse(old)) else emptyList()
+            }
+            return raw.split('\n').filter { it.isNotBlank() }.map { Uri.parse(it) }
+        }
         set(value) {
-            sp.edit().putString("tree", value?.toString()).apply()
+            sp.edit().putString("trees", value.joinToString("\n") { it.toString() }).apply()
         }
 
     var selection: Set<String>

@@ -1,6 +1,14 @@
 package com.manhwareader
 
+import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +50,7 @@ import androidx.compose.foundation.background
 @Composable
 fun HomeScreen(vm: AppViewModel, onPickFolder: () -> Unit) {
     val snackbar = rememberMessageHost(vm)
+    var showFolders by remember { mutableStateOf(false) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -52,8 +61,8 @@ fun HomeScreen(vm: AppViewModel, onPickFolder: () -> Unit) {
                     if (vm.hasFolder) {
                         TextButton(onClick = { vm.rescan() }) { Text("Refresh") }
                     }
-                    TextButton(onClick = onPickFolder) {
-                        Text(if (vm.hasFolder) "Folder" else "Pick folder")
+                    TextButton(onClick = { if (vm.hasFolder) showFolders = true else onPickFolder() }) {
+                        Text(if (vm.hasFolder) "Folders" else "Pick folder")
                     }
                 },
             )
@@ -89,7 +98,54 @@ fun HomeScreen(vm: AppViewModel, onPickFolder: () -> Unit) {
     }
 
     PreparingDialog(vm)
+
+    if (showFolders && vm.hasFolder) {
+        FoldersDialog(
+            vm,
+            onAdd = {
+                showFolders = false
+                onPickFolder()
+            },
+            onDismiss = { showFolders = false },
+        )
+    }
 }
+
+/** Lists the added folders. Add as many as you like; removing one never deletes your files. */
+@Composable
+private fun FoldersDialog(vm: AppViewModel, onAdd: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Your folders") },
+        text = {
+            Column {
+                vm.folders.forEach { f ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            folderLabel(f),
+                            modifier = Modifier.weight(1f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        TextButton(onClick = { vm.removeFolder(f) }) { Text("Remove") }
+                    }
+                }
+                Text(
+                    "Removing a folder only takes it out of the app. Your files are not deleted.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onAdd) { Text("Add folder") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
+}
+
+private fun folderLabel(uri: Uri): String = runCatching {
+    DocumentsContract.getTreeDocumentId(uri).substringAfter(':').ifBlank { "Phone storage" }
+}.getOrDefault(uri.toString())
 
 @Composable
 private fun EmptyState(text: String, buttonLabel: String, onClick: () -> Unit) {
