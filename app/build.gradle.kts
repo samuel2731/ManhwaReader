@@ -12,14 +12,36 @@ android {
         applicationId = "com.manhwareader"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 5
+        versionName = "1.5"
+    }
+
+    // One fixed key for every build, so a new APK installs over the old one without uninstalling.
+    signingConfigs {
+        create("nux") {
+            storeFile = file("nux.jks")
+            storePassword = "nuxreader"
+            keyAlias = "nux"
+            keyPassword = "nuxreader"
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // The optimized build: much smoother than a debug build.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("nux")
         }
+        debug {
+            signingConfig = signingConfigs.getByName("nux")
+        }
+    }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 
     compileOptions {

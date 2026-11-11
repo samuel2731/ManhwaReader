@@ -41,6 +41,15 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Pick a picture to use as the cover of the manhwa that is currently open.
+                val coverPicker = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument()
+                ) { uri ->
+                    val name = vm.openName
+                    // The picture is copied into the app, so no lasting permission is needed.
+                    if (uri != null && name != null) vm.setCover(name, uri)
+                }
+
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val session = vm.reader
                     val open = vm.currentSeries
@@ -51,7 +60,10 @@ class MainActivity : ComponentActivity() {
                             onPosition = { ci, page -> vm.onPosition(ci, page) },
                             onClose = { vm.closeReader() },
                         )
-                        open != null -> SeriesScreen(vm, open)
+                        open != null -> SeriesScreen(
+                            vm, open,
+                            onPickCover = { coverPicker.launch(arrayOf("image/*")) },
+                        )
                         else -> HomeScreen(vm, onPickFolder = { picker.launch(null) })
                     }
                 }

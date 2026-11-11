@@ -49,6 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -67,7 +69,16 @@ fun ReaderScreen(
     var showChapters by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    BackHandler { onClose() }
+    // Save exactly where you stopped, then leave.
+    val closeReader: () -> Unit = {
+        val (ci, pi) = listState.firstVisibleItemIndex
+            .coerceIn(0, session.total - 1)
+            .let { g -> session.chapterAt(g).let { c -> c to (g - session.offsets[c]) } }
+        onPosition(ci, pi)
+        onClose()
+    }
+
+    BackHandler { closeReader() }
 
     // Full screen while reading, and don't let the screen turn off.
     DisposableEffect(view) {
@@ -91,8 +102,12 @@ fun ReaderScreen(
     }
 
     // Remember where the reader got to so "Continue reading" can pick up from here.
+    // Written only after you pause for a moment, not on every page you fly past.
     LaunchedEffect(session) {
-        snapshotFlow { current }.collect { (ci, pi) -> onPosition(ci, pi) }
+        snapshotFlow { current }.collectLatest { (ci, pi) ->
+            delay(500)
+            onPosition(ci, pi)
+        }
     }
 
     BoxWithConstraints(
@@ -102,6 +117,18 @@ fun ReaderScreen(
             .pointerInput(Unit) { detectTapGestures(onTap = { showBar = !showBar }) }
     ) {
         val widthPx = constraints.maxWidth
+
+        // Get the next few pages ready while you look at this one, so scrolling doesn't stall.
+        LaunchedEffect(session, widthPx) {
+            snapshotFlow { listState.firstVisibleItemIndex }.collectLatest { first ->
+                delay(150) // let the pages on screen render first
+                for (g in (first + 1)..(first + 3)) {
+                    if (g >= session.total) break
+                    val ci = session.chapterAt(g)
+                    engine.render(session.chapters[ci].chapter.uri, g - session.offsets[ci], widthPx)
+                }
+            }
+        }
 
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             items(count = session.total, key = { it }) { g ->
@@ -137,7 +164,7 @@ fun ReaderScreen(
                         )
                     }
                     TextButton(onClick = { showChapters = true }) { Text("Chapters") }
-                    TextButton(onClick = onClose) { Text("Close") }
+                    TextButton(onClick = closeReader) { Text("Close") }
                 }
             }
         }
@@ -193,7 +220,10 @@ private fun PageItem(session: ReaderSession, global: Int, engine: PdfEngine, wid
         if (page == 0) ChapterHeader(ch.chapter.title)
 
         val b = bmp
-        val ratio = (b?.let { it.height.toFloat() / it.width } ?: ch.ratio).coerceIn(0.1f, 40f)
+        // Use the real page shape when known so the list doesn't jump as pages load.
+        val ratio = (b?.let { it.height.toFloat() / it.width }
+            ?: engine.ratioOf(uri, page)
+            ?: ch.ratio).coerceIn(0.1f, 40f)
         Box(
             Modifier
                 .fillMaxWidth()
@@ -203,7 +233,7 @@ private fun PageItem(session: ReaderSession, global: Int, engine: PdfEngine, wid
         ) {
             when {
                 b != null -> Image(
-                    bitmap = b.asImageBitmap(),
+                    bitmap = remember(b) { b.asImageBitmap() },
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.FillBounds,

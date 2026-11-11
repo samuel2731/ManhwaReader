@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 /** Chapter list of one manhwa. Ticks stay when you go back and open another manhwa. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SeriesScreen(vm: AppViewModel, series: Series) {
+fun SeriesScreen(vm: AppViewModel, series: Series, onPickCover: () -> Unit) {
     BackHandler { vm.closeSeries() }
 
     val snackbar = rememberMessageHost(vm)
@@ -76,6 +76,12 @@ fun SeriesScreen(vm: AppViewModel, series: Series) {
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary,
                         )
+                        Row {
+                            TextButton(onClick = onPickCover) { Text("Change cover") }
+                            if (vm.hasCustomCover(series.name)) {
+                                TextButton(onClick = { vm.setCover(series.name, null) }) { Text("Reset") }
+                            }
+                        }
                     }
                 }
             }

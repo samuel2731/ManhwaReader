@@ -56,7 +56,7 @@ fun HomeScreen(vm: AppViewModel, onPickFolder: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
-                title = { Text("My Manhwa") },
+                title = { Text("NUX READER") },
                 actions = {
                     if (vm.hasFolder) {
                         TextButton(onClick = { vm.rescan() }) { Text("Refresh") }

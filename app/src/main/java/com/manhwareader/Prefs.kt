@@ -2,6 +2,7 @@ package com.manhwareader
 
 import android.content.Context
 import android.net.Uri
+import org.json.JSONObject
 
 /** Small on-device storage: chosen folder, selection, reading position, cached page counts. */
 class Prefs(context: Context) {
@@ -26,6 +27,19 @@ class Prefs(context: Context) {
         get() = (sp.getStringSet("selection", null) ?: emptySet()).toSet()
         set(value) {
             sp.edit().putStringSet("selection", value).apply()
+        }
+
+    /** Cover pictures the user picked inside the app: manhwa name to image address. */
+    var customCovers: Map<String, String>
+        get() {
+            val raw = sp.getString("covers", null) ?: return emptyMap()
+            return runCatching {
+                val o = JSONObject(raw)
+                o.keys().asSequence().associateWith { o.getString(it) }
+            }.getOrDefault(emptyMap())
+        }
+        set(value) {
+            sp.edit().putString("covers", JSONObject(value).toString()).apply()
         }
 
     fun resume(): Pair<String, Int>? {

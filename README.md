@@ -1,4 +1,4 @@
-# Manhwa Reader (Android)
+# NUX READER (Android)
 
 Offline manhwa reader for PDF chapters. No internet needed, no ads, nothing leaves your phone.
 
@@ -31,12 +31,14 @@ Manhwa/
 
 If there is no cover image, the first page of chapter 1 is used as the icon.
 
+You can also set a cover from inside the app: open a manhwa and tap **Change cover**, then pick any picture on your phone. **Reset** goes back to the default.
+
 ## Build the APK
 
 1. Install **Android Studio** on a computer.
 2. Open this `ManhwaReader` folder in it and wait for Gradle sync to finish (needs internet once).
 3. Phone: Settings > About phone > tap Build number 7 times, then turn on USB debugging in Developer options. Plug the phone in and press Run.
-   Or: Build > Build APK(s), copy `app-debug.apk` to the phone and install it.
+   Or: Build > Generate Signed App Bundle / APK > APK > release, copy the APK to the phone and install it.
 4. Open the app, tap **Pick folder**, choose your manhwa folder.
 
 If Android Studio offers to update Gradle or library versions, accept.
@@ -46,7 +48,9 @@ If Android Studio offers to update Gradle or library versions, accept.
 1. Make a free GitHub account and create a new repository.
 2. Upload the contents of this folder to it (keep the `.github` folder).
 3. Open the repository's **Actions** tab, choose **Build APK**, tap **Run workflow**.
-4. When it finishes, open the run and download **ManhwaReader-apk**. Unzip it and install `app-debug.apk`.
+4. When it finishes, open the run and download **NUX-Reader-apk**. Unzip it and install `NUX-Reader.apk`.
+
+The APK is an optimized release build signed with the fixed key in `app/nux.jks`, so each new build installs over the previous one (no uninstalling, and your folders stay). That key is for personal use only; do not publish the app with it.
 
 ## Known limits
 

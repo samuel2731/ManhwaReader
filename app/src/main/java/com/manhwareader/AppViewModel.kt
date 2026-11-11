@@ -43,6 +43,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         get() = openName?.let { n -> series.firstOrNull { it.name == n } }
 
     private var scanJob: Job? = null
+    private var scanId = 0
+    /** Cover pictures found inside the folders themselves (cover.png etc.). */
+    private var folderCovers: Map<String, Uri> = emptyMap()
 
     init {
         rescan()
@@ -68,6 +71,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             scanning = false
             return
         }
+        val myScan = ++scanId
         scanJob = viewModelScope.launch {
             scanning = true
             try {
@@ -77,8 +81,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 found.onSuccess { (data, failed) ->
                     val list = data.chapters
                     chapters = list
-                    series = list.groupBy { it.series }
-                        .map { (name, items) -> Series(name, items, data.covers[name]) }
+                    folderCovers = data.covers
+                    buildSeries()
                     if (series.none { it.name == openName }) openName = null
                     val saved = prefs.selection
                     selected = list.map { it.uri }.filter { it.toString() in saved }.toSet()
@@ -91,7 +95,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     message = "Can't open that folder. Please pick it again."
                 }
             } finally {
-                scanning = false
+                // An older, cancelled scan must not hide the spinner of a newer one.
+                if (myScan == scanId) scanning = false
             }
         }
     }
@@ -207,11 +212,44 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         reader = null
     }
 
+    /** Groups chapters into manhwa and picks each one's cover: your own picture first, then a cover file in the folder. */
+    private fun buildSeries() {
+        val custom = prefs.customCovers
+        series = chapters.groupBy { it.series }.map { (name, items) ->
+            Series(name, items, custom[name]?.let { Uri.parse(it) } ?: folderCovers[name])
+        }
+    }
+
+    fun hasCustomCover(name: String): Boolean = prefs.customCovers.containsKey(name)
+
+    /** Sets the picture used as this manhwa's cover. Pass null to go back to the default. */
+    fun setCover(name: String, uri: Uri?) {
+        viewModelScope.launch {
+            val current = prefs.customCovers
+            if (uri == null) {
+                current[name]?.let { engine.deleteCover(it) }
+                prefs.customCovers = current - name
+            } else {
+                val saved = engine.importCover(uri, name)
+                if (saved == null) {
+                    message = "Couldn't use that picture."
+                    return@launch
+                }
+                prefs.customCovers = current + (name to saved.toString())
+            }
+            buildSeries() // no need to scan the folders again
+        }
+    }
+
     fun openSeries(name: String) {
         openName = name
     }
 
     fun closeSeries() {
         openName = null
+    }
+
+    override fun onCleared() {
+        engine.close()
     }
 }
