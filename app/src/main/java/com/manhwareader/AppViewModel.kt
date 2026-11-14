@@ -163,7 +163,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var darkTheme by mutableStateOf(prefs.darkTheme)
         private set
 
-    fun setDarkTheme(on: Boolean) {
+    fun chooseTheme(on: Boolean) {
         darkTheme = on
         prefs.darkTheme = on
     }

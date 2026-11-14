@@ -76,14 +76,14 @@ fun HomeScreen(vm: AppViewModel, onPickFolder: () -> Unit) {
                             DropdownMenuItem(
                                 text = { Text(if (!vm.darkTheme) "✓  Light theme" else "      Light theme") },
                                 onClick = {
-                                    vm.setDarkTheme(false)
+                                    vm.chooseTheme(false)
                                     menuOpen = false
                                 },
                             )
                             DropdownMenuItem(
                                 text = { Text(if (vm.darkTheme) "✓  Dark theme" else "      Dark theme") },
                                 onClick = {
-                                    vm.setDarkTheme(true)
+                                    vm.chooseTheme(true)
                                     menuOpen = false
                                 },
                             )
