@@ -12,8 +12,8 @@ android {
         applicationId = "com.manhwareader"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.6"
+        versionCode = 7
+        versionName = "1.7"
     }
 
     // One fixed key for every build, so a new APK installs over the old one without uninstalling.

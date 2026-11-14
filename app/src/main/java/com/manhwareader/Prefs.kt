@@ -23,6 +23,13 @@ class Prefs(context: Context) {
             sp.edit().putString("trees", value.joinToString("\n") { it.toString() }).apply()
         }
 
+    /** The theme chosen in the menu. Light unless the user switched. */
+    var darkTheme: Boolean
+        get() = sp.getBoolean("dark_theme", false)
+        set(value) {
+            sp.edit().putBoolean("dark_theme", value).apply()
+        }
+
     var selection: Set<String>
         get() = (sp.getStringSet("selection", null) ?: emptySet()).toSet()
         set(value) {

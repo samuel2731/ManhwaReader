@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +53,8 @@ import androidx.compose.ui.unit.dp
 fun HomeScreen(vm: AppViewModel, onPickFolder: () -> Unit) {
     val snackbar = rememberMessageHost(vm)
     var showFolders by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -63,6 +67,34 @@ fun HomeScreen(vm: AppViewModel, onPickFolder: () -> Unit) {
                     }
                     TextButton(onClick = { if (vm.hasFolder) showFolders = true else onPickFolder() }) {
                         Text(if (vm.hasFolder) "Folders" else "Pick folder")
+                    }
+                    Box {
+                        TextButton(onClick = { menuOpen = true }) {
+                            Text("⋮", style = MaterialTheme.typography.titleLarge)
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(if (!vm.darkTheme) "✓  Light theme" else "      Light theme") },
+                                onClick = {
+                                    vm.setDarkTheme(false)
+                                    menuOpen = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (vm.darkTheme) "✓  Dark theme" else "      Dark theme") },
+                                onClick = {
+                                    vm.setDarkTheme(true)
+                                    menuOpen = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("About") },
+                                onClick = {
+                                    menuOpen = false
+                                    showAbout = true
+                                },
+                            )
+                        }
                     }
                 },
             )
@@ -116,6 +148,8 @@ fun HomeScreen(vm: AppViewModel, onPickFolder: () -> Unit) {
 
     PreparingDialog(vm)
 
+    if (showAbout) AboutDialog(onDismiss = { showAbout = false })
+
     if (showFolders && vm.hasFolder) {
         FoldersDialog(
             vm,
@@ -128,7 +162,10 @@ fun HomeScreen(vm: AppViewModel, onPickFolder: () -> Unit) {
     }
 }
 
-/** Lists the added folders. Add as many as you like; removing one never deletes your files. */
+/**
+ * Lists the added folders. You can only add folders here. To remove one, delete it
+ * in your Files app: it drops out of NUX READER by itself.
+ */
 @Composable
 private fun FoldersDialog(vm: AppViewModel, onAdd: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
@@ -137,18 +174,15 @@ private fun FoldersDialog(vm: AppViewModel, onAdd: () -> Unit, onDismiss: () -> 
         text = {
             Column {
                 vm.folders.forEach { f ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            folderLabel(f),
-                            modifier = Modifier.weight(1f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        TextButton(onClick = { vm.removeFolder(f) }) { Text("Remove") }
-                    }
+                    Text(
+                        folderLabel(f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    )
                 }
                 Text(
-                    "Removing a folder only takes it out of the app. Your files are not deleted.",
+                    "To remove a folder, delete it in your Files app. It disappears from here the next time the app refreshes.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp),

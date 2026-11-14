@@ -1,7 +1,6 @@
 package com.manhwareader
 
 import android.app.Application
-import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -81,16 +80,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val found = withContext(Dispatchers.IO) {
                     runCatching { scanAll(trees) }
                 }
-                found.onSuccess { (data, failed) ->
+                found.onSuccess { (data, failed, gone) ->
                     val list = data.chapters
+                    // Folders that were deleted from the phone are dropped from the app by themselves.
+                    if (gone.isNotEmpty()) {
+                        prefs.trees = prefs.trees.filter { it !in gone }
+                        folders = prefs.trees
+                    }
                     chapters = list
                     folderCovers = data.covers
                     buildSeries()
                     if (series.none { it.name == openName }) openName = null
                     val saved = prefs.selection
                     selected = list.map { it.uri }.filter { it.toString() in saved }.toSet()
-                    if (failed > 0) {
-                        message = "$failed folder(s) couldn't be opened. Remove them and add them again."
+                    if (gone.isNotEmpty()) {
+                        message = "A folder was deleted or moved on your phone, so it was taken out of the app."
+                    } else if (failed > 0) {
+                        message = "$failed folder(s) couldn't be opened."
                     } else if (list.isEmpty()) {
                         message = "No PDF files found in your folders."
                     }
@@ -104,12 +110,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Scans every added folder and merges the results. Returns the library and how many folders failed. */
-    private fun scanAll(trees: List<Uri>): Pair<LibraryData, Int> {
+    /**
+     * Scans every added folder and merges the results.
+     * Returns the library, how many folders failed to open, and the folders that no longer exist.
+     */
+    private fun scanAll(trees: List<Uri>): Triple<LibraryData, Int, List<Uri>> {
         val app = getApplication<Application>()
         val all = ArrayList<Chapter>()
         val covers = HashMap<String, Uri>()
         val seen = HashSet<String>()
+        val gone = ArrayList<Uri>()
         var failed = 0
 
         // The same chapter found twice (two folders, or one you were also sent) is listed once.
@@ -121,6 +131,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         for (t in trees) {
+            if (!LibraryScanner.exists(app, t)) {
+                gone.add(t)
+                continue
+            }
             val r = runCatching { LibraryScanner.scan(app, t) }.getOrNull()
             if (r == null) {
                 failed++
@@ -139,20 +153,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
 
-        if (trees.isNotEmpty() && failed == trees.size && all.isEmpty()) {
+        if (trees.isNotEmpty() && failed + gone.size == trees.size && all.isEmpty() && failed > 0) {
             throw IllegalStateException("No folder could be opened")
         }
-        return LibraryData(all.sortedWith(LibraryScanner.ORDER), covers) to failed
+        return Triple(LibraryData(all.sortedWith(LibraryScanner.ORDER), covers), failed, gone)
     }
 
-    fun removeFolder(uri: Uri) {
-        runCatching {
-            getApplication<Application>().contentResolver
-                .releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        prefs.trees = prefs.trees - uri
-        folders = prefs.trees
-        rescan()
+    /** The theme chosen in the menu. */
+    var darkTheme by mutableStateOf(prefs.darkTheme)
+        private set
+
+    fun setDarkTheme(on: Boolean) {
+        darkTheme = on
+        prefs.darkTheme = on
     }
 
     private fun updateSelected(set: Set<Uri>) {

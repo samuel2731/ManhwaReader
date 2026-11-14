@@ -225,6 +225,12 @@ object LibraryScanner {
         return if (base in setOf("cover", "folder", "poster", "thumbnail", "thumb", "icon")) 0 else 1
     }
 
+    /** False when the folder was deleted, moved or renamed on the phone. */
+    fun exists(context: Context, tree: Uri): Boolean {
+        val id = runCatching { DocumentsContract.getTreeDocumentId(tree) }.getOrNull() ?: return false
+        return displayName(context, tree, id) != null
+    }
+
     private fun displayName(context: Context, tree: Uri, docId: String): String? {
         val docUri = DocumentsContract.buildDocumentUriUsingTree(tree, docId)
         return runCatching {

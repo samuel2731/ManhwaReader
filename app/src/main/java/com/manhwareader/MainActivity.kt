@@ -12,7 +12,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.graphics.Color as ComposeColor
@@ -28,6 +30,17 @@ private val NuxLight = lightColorScheme(
     onSurfaceVariant = ComposeColor(0xFF5B5668),
 )
 
+/** Dark theme, same purple. */
+private val NuxDark = darkColorScheme(
+    primary = ComposeColor(0xFFB69DFF),
+    onPrimary = ComposeColor(0xFF2B0A73),
+    secondary = ComposeColor(0xFFCFBDFF),
+    background = ComposeColor(0xFF141218),
+    surface = ComposeColor(0xFF141218),
+    surfaceVariant = ComposeColor(0xFF2E2A38),
+    onSurfaceVariant = ComposeColor(0xFFCAC4D6),
+)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,10 +49,23 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
         setContent {
-            MaterialTheme(colorScheme = NuxLight) {
-                val vm: AppViewModel = viewModel()
-                val share: ShareViewModel = viewModel()
+            val vm: AppViewModel = viewModel()
+            val share: ShareViewModel = viewModel()
+            val dark = vm.darkTheme
 
+            // Status bar icons and the window colour follow the theme chosen in the menu.
+            DisposableEffect(dark) {
+                enableEdgeToEdge(
+                    statusBarStyle = if (dark) SystemBarStyle.dark(Color.TRANSPARENT)
+                    else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+                    navigationBarStyle = if (dark) SystemBarStyle.dark(Color.TRANSPARENT)
+                    else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+                )
+                window.decorView.setBackgroundColor(if (dark) 0xFF141218.toInt() else 0xFFFBF9FF.toInt())
+                onDispose {}
+            }
+
+            MaterialTheme(colorScheme = if (dark) NuxDark else NuxLight) {
                 val picker = rememberLauncherForActivityResult(
                     ActivityResultContracts.OpenDocumentTree()
                 ) { uri ->
