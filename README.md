@@ -74,7 +74,7 @@ To run a new build yourself: **Actions**, **Build APK**, **Run workflow**. Every
 
 ## Technical notes
 
-- Kotlin and Jetpack Compose (Material 3), minimum Android 8.0 (API 26).
+- Kotlin and Jetpack Compose (Material 3), minimum Android 5.0 (API 21).
 - Pages are drawn with Android's built-in `PdfRenderer`.
 - Folders are opened through Android's folder picker, so no storage permission is needed.
 - Phone-to-phone sharing uses Android's local network discovery and a plain connection on port 45454. Only PDF and picture files are accepted, and only after the receiver taps Accept.

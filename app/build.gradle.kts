@@ -10,10 +10,10 @@ android {
 
     defaultConfig {
         applicationId = "com.manhwareader"
-        minSdk = 26
+        minSdk = 21
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.7"
+        versionCode = 8
+        versionName = "1.7.1"
     }
 
     // One fixed key for every build, so a new APK installs over the old one without uninstalling.
