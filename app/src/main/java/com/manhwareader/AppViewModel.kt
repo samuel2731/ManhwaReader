@@ -177,15 +177,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var coverJob: Job? = null
 
-    /** The Find cover online button: tries one manhwa and says what happened. */
-    fun findCoverOnline(name: String) {
+    /** What happened in the last manual search, shown in the Find online box. */
+    var coverReport by mutableStateOf<String?>(null)
+        private set
+
+    fun clearCoverReport() {
+        coverReport = null
+    }
+
+    /** The Find online box: searches for [query] and saves the cover for [name]. */
+    fun findCoverOnline(name: String, query: String) {
         if (findingCover != null) return
         findingCover = name
+        coverReport = null
         viewModelScope.launch {
             try {
-                val ok = fetchCover(name, strict = false)
-                message = if (ok) "Cover found." else
-                    "No cover found for \"$name\". Check your internet, or use Change cover."
+                val log = ArrayList<String>()
+                val ok = fetchCover(name, query, strict = false, log = log)
+                coverReport = if (ok) "Cover found and saved." else
+                    "No cover found.\n\n" + log.joinToString("\n")
             } finally {
                 findingCover = null
             }
@@ -193,20 +203,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Downloads and saves a cover. True if it worked. */
-    private suspend fun fetchCover(name: String, strict: Boolean): Boolean {
-        val bytes = withContext(Dispatchers.IO) { CoverFinder.find(name, strict) } ?: return false
+    private suspend fun fetchCover(name: String, query: String, strict: Boolean, log: MutableList<String>): Boolean {
+        val bytes = withContext(Dispatchers.IO) { CoverFinder.find(query, strict, log) } ?: return false
         val tmp = withContext(Dispatchers.IO) {
             runCatching {
                 java.io.File.createTempFile("cover", ".img", getApplication<Application>().cacheDir)
                     .also { it.writeBytes(bytes) }
             }.getOrNull()
-        } ?: return false
+        }
+        if (tmp == null) {
+            log.add("Couldn't save the picture on the phone.")
+            return false
+        }
         val saved = try {
             engine.importCover(Uri.fromFile(tmp), name)
         } finally {
             tmp.delete()
         }
-        if (saved == null) return false
+        if (saved == null) {
+            log.add("The downloaded picture couldn't be read.")
+            return false
+        }
         val current = prefs.customCovers
         current[name]?.let { engine.deleteCover(it) }
         prefs.customCovers = current + (name to saved.toString())
@@ -224,7 +241,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             for (name in todo) {
                 if (!autoCover) break
                 if (findingCover != null) continue
-                val ok = fetchCover(name, strict = true)
+                val ok = fetchCover(name, name, strict = true, log = ArrayList())
                 // A manhwa that gets no match is not searched again until you press Find cover online.
                 if (!ok) prefs.coverTried = prefs.coverTried + name
                 delay(800) // stay well inside the database's rate limit

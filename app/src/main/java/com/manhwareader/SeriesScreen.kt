@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
@@ -45,6 +46,8 @@ fun SeriesScreen(vm: AppViewModel, series: Series, onPickCover: () -> Unit) {
     val allSelected = selectedHere == series.chapters.size
     // Position (in this manhwa's list) of the chapter whose options are showing.
     var optionsFor by remember { mutableStateOf<Int?>(null) }
+    // Text in the Find online box; null while the box is closed.
+    var findQuery by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -85,7 +88,7 @@ fun SeriesScreen(vm: AppViewModel, series: Series, onPickCover: () -> Unit) {
                         Row {
                             TextButton(onClick = onPickCover) { Text("Change cover") }
                             TextButton(
-                                onClick = { vm.findCoverOnline(series.name) },
+                                onClick = { findQuery = CoverFinder.clean(series.name) },
                                 enabled = vm.findingCover == null,
                             ) { Text(if (vm.findingCover == series.name) "Searching…" else "Find online") }
                             if (vm.hasCustomCover(series.name)) {
@@ -121,6 +124,56 @@ fun SeriesScreen(vm: AppViewModel, series: Series, onPickCover: () -> Unit) {
     }
 
     PreparingDialog(vm)
+
+    val fq = findQuery
+    if (fq != null) {
+        val busy = vm.findingCover != null
+        AlertDialog(
+            onDismissRequest = {
+                if (!busy) {
+                    findQuery = null
+                    vm.clearCoverReport()
+                }
+            },
+            title = { Text("Find cover online") },
+            text = {
+                Column {
+                    Text(
+                        "Type the manhwa's title as it appears on AniList or MangaDex.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    OutlinedTextField(
+                        value = fq,
+                        onValueChange = { findQuery = it },
+                        singleLine = true,
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                    if (busy) {
+                        Text("Searching…", modifier = Modifier.padding(top = 12.dp))
+                    }
+                    vm.coverReport?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !busy && fq.isNotBlank(),
+                    onClick = { vm.findCoverOnline(series.name, fq) },
+                ) { Text("Search") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !busy,
+                    onClick = {
+                        findQuery = null
+                        vm.clearCoverReport()
+                    },
+                ) { Text("Close") }
+            },
+        )
+    }
 
     val idx = optionsFor
     val tapped = if (idx != null) series.chapters.getOrNull(idx) else null
