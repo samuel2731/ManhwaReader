@@ -77,7 +77,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 AboutSection(
                     "Privacy",
                     "Everything stays on your phone. The network is used only to send or receive manhwa " +
-                        "with a phone nearby, and to look up a cover by the manhwa's name on AniList. " +
+                        "with a phone nearby, and to look up a cover by the manhwa's name on AniList or MangaDex. " +
                         "Only the name is sent. Turn this off with Auto-find covers in the menu.",
                 )
             }
