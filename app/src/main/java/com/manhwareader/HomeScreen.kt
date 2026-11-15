@@ -88,6 +88,13 @@ fun HomeScreen(vm: AppViewModel, onPickFolder: () -> Unit) {
                                 },
                             )
                             DropdownMenuItem(
+                                text = { Text(if (vm.autoCover) "✓  Auto-find covers" else "      Auto-find covers") },
+                                onClick = {
+                                    vm.chooseAutoCover(!vm.autoCover)
+                                    menuOpen = false
+                                },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("About") },
                                 onClick = {
                                     menuOpen = false

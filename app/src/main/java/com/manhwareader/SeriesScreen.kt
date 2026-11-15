@@ -84,6 +84,10 @@ fun SeriesScreen(vm: AppViewModel, series: Series, onPickCover: () -> Unit) {
                         )
                         Row {
                             TextButton(onClick = onPickCover) { Text("Change cover") }
+                            TextButton(
+                                onClick = { vm.findCoverOnline(series.name) },
+                                enabled = vm.findingCover == null,
+                            ) { Text(if (vm.findingCover == series.name) "Searching…" else "Find online") }
                             if (vm.hasCustomCover(series.name)) {
                                 TextButton(onClick = { vm.setCover(series.name, null) }) { Text("Reset") }
                             }

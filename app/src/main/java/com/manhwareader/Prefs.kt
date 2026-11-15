@@ -49,6 +49,20 @@ class Prefs(context: Context) {
             sp.edit().putString("covers", JSONObject(value).toString()).apply()
         }
 
+    /** Look up covers online for manhwa that have none. On unless switched off in the menu. */
+    var autoCover: Boolean
+        get() = sp.getBoolean("auto_cover", true)
+        set(value) {
+            sp.edit().putBoolean("auto_cover", value).apply()
+        }
+
+    /** Manhwa the automatic search already tried, so it doesn't repeat every time the app opens. */
+    var coverTried: Set<String>
+        get() = (sp.getStringSet("cover_tried", null) ?: emptySet()).toSet()
+        set(value) {
+            sp.edit().putStringSet("cover_tried", value).apply()
+        }
+
     fun resume(): Pair<String, Int>? {
         val uri = sp.getString("resume_uri", null) ?: return null
         return uri to sp.getInt("resume_page", 0)

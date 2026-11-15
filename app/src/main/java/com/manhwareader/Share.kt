@@ -75,7 +75,8 @@ object Share {
     private const val MAGIC = "NUXREADER-SHARE-1"
     const val SERVICE_TYPE = "_nuxreader._tcp."
     const val PORT = 45454
-    private const val CHUNK = 64 * 1024
+    private const val CHUNK = 256 * 1024
+    private const val MAX_FRAME = 1024 * 1024
     private val ALLOWED = setOf("pdf", "png", "jpg", "jpeg", "webp")
 
     /** Received manhwa are kept here, inside the app's own storage. No permission needed. */
@@ -153,6 +154,7 @@ object Share {
         val socket = Socket()
         holder.socket = socket
         try {
+            socket.sendBufferSize = 512 * 1024
             socket.connect(InetSocketAddress(address, port), 8_000)
             socket.soTimeout = 130_000
             val out = DataOutputStream(BufferedOutputStream(socket.getOutputStream(), CHUNK))
@@ -171,6 +173,7 @@ object Share {
 
             val buf = ByteArray(CHUNK)
             var sent = 0L
+            var lastReport = 0L
             for (item in items) {
                 out.writeUTF(item.relPath)
                 val stream = context.contentResolver.openInputStream(item.uri)
@@ -180,15 +183,26 @@ object Share {
                 }
                 stream.use { ins ->
                     while (true) {
-                        val n = ins.read(buf)
-                        if (n < 0) break
-                        if (n == 0) continue
+                        // Fill the whole buffer first: phone file streams often hand back small pieces.
+                        var n = 0
+                        while (n < buf.size) {
+                            val r = ins.read(buf, n, buf.size - n)
+                            if (r < 0) break
+                            n += r
+                        }
+                        if (n == 0) break
                         out.writeInt(n)
                         out.write(buf, 0, n)
                         sent += n
-                        onProgress(sent)
+                        val now = System.nanoTime()
+                        if (now - lastReport > 200_000_000L) {
+                            lastReport = now
+                            onProgress(sent)
+                        }
+                        if (n < buf.size) break
                     }
                 }
+                onProgress(sent)
                 out.writeInt(0)
             }
             out.flush()
@@ -226,6 +240,7 @@ object Share {
         decide: suspend (Offer) -> Boolean,
         onProgress: (Offer, Long) -> Unit,
     ): ReceiveResult {
+        runCatching { socket.receiveBufferSize = 512 * 1024 }
         val inp = DataInputStream(BufferedInputStream(socket.getInputStream(), CHUNK))
         val out = DataOutputStream(BufferedOutputStream(socket.getOutputStream()))
         socket.soTimeout = 15_000
@@ -243,7 +258,8 @@ object Share {
 
         socket.soTimeout = 60_000
         baseDir.mkdirs()
-        val buf = ByteArray(CHUNK)
+        val buf = ByteArray(MAX_FRAME)
+        var lastReport = 0L
         var got = 0L
         var saved = 0
         val touched = LinkedHashSet<String>()
@@ -265,11 +281,15 @@ object Share {
                 }
                 var n = first
                 while (n != 0) {
-                    if (n < 0 || n > CHUNK) throw IOException("Bad data from the other phone")
+                    if (n < 0 || n > MAX_FRAME) throw IOException("Bad data from the other phone")
                     inp.readFully(buf, 0, n)
                     os?.write(buf, 0, n)
                     got += n
-                    onProgress(offer, got)
+                    val now = System.nanoTime()
+                    if (now - lastReport > 200_000_000L) {
+                        lastReport = now
+                        onProgress(offer, got)
+                    }
                     n = inp.readInt()
                 }
                 os?.close()

@@ -9,6 +9,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -91,6 +92,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     folderCovers = data.covers
                     buildSeries()
                     if (series.none { it.name == openName }) openName = null
+                    autoFindCovers()
                     val saved = prefs.selection
                     selected = list.map { it.uri }.filter { it.toString() in saved }.toSet()
                     if (gone.isNotEmpty()) {
@@ -157,6 +159,77 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             throw IllegalStateException("No folder could be opened")
         }
         return Triple(LibraryData(all.sortedWith(LibraryScanner.ORDER), covers), failed, gone)
+    }
+
+    /** Whether covers are looked up online automatically. */
+    var autoCover by mutableStateOf(prefs.autoCover)
+        private set
+
+    fun chooseAutoCover(on: Boolean) {
+        autoCover = on
+        prefs.autoCover = on
+        if (on) autoFindCovers()
+    }
+
+    /** Name of the manhwa whose cover is being looked up right now, if any. */
+    var findingCover by mutableStateOf<String?>(null)
+        private set
+
+    private var coverJob: Job? = null
+
+    /** The Find cover online button: tries one manhwa and says what happened. */
+    fun findCoverOnline(name: String) {
+        if (findingCover != null) return
+        findingCover = name
+        viewModelScope.launch {
+            try {
+                val ok = fetchCover(name, strict = false)
+                message = if (ok) "Cover found." else
+                    "No cover found for \"$name\". Check your internet, or use Change cover."
+            } finally {
+                findingCover = null
+            }
+        }
+    }
+
+    /** Downloads and saves a cover. True if it worked. */
+    private suspend fun fetchCover(name: String, strict: Boolean): Boolean {
+        val bytes = withContext(Dispatchers.IO) { CoverFinder.find(name, strict) } ?: return false
+        val tmp = withContext(Dispatchers.IO) {
+            runCatching {
+                java.io.File.createTempFile("cover", ".img", getApplication<Application>().cacheDir)
+                    .also { it.writeBytes(bytes) }
+            }.getOrNull()
+        } ?: return false
+        val saved = try {
+            engine.importCover(Uri.fromFile(tmp), name)
+        } finally {
+            tmp.delete()
+        }
+        if (saved == null) return false
+        val current = prefs.customCovers
+        current[name]?.let { engine.deleteCover(it) }
+        prefs.customCovers = current + (name to saved.toString())
+        buildSeries()
+        return true
+    }
+
+    /** Looks up covers, one by one, for manhwa that have none and weren't tried before. */
+    private fun autoFindCovers() {
+        if (!autoCover || coverJob?.isActive == true) return
+        coverJob = viewModelScope.launch {
+            val todo = series
+                .filter { it.coverImage == null && it.name !in prefs.coverTried }
+                .map { it.name }
+            for (name in todo) {
+                if (!autoCover) break
+                if (findingCover != null) continue
+                val ok = fetchCover(name, strict = true)
+                // A manhwa that gets no match is not searched again until you press Find cover online.
+                if (!ok) prefs.coverTried = prefs.coverTried + name
+                delay(800) // stay well inside the database's rate limit
+            }
+        }
     }
 
     /** The theme chosen in the menu. */
@@ -267,6 +340,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (uri == null) {
                 current[name]?.let { engine.deleteCover(it) }
                 prefs.customCovers = current - name
+                // After Reset, don't download another cover by itself for this one.
+                prefs.coverTried = prefs.coverTried + name
             } else {
                 val saved = engine.importCover(uri, name)
                 if (saved == null) {

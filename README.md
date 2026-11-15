@@ -2,7 +2,7 @@
 
 An offline manhwa reader for Android. It reads the PDF chapters already saved on your phone, so you can go through many chapters in one long scroll without leaving the app.
 
-No ads, no accounts. Everything stays on your phone.
+No ads, no accounts. Your library stays on your phone.
 
 ## Features
 
@@ -12,6 +12,7 @@ No ads, no accounts. Everything stays on your phone.
 - **Pick several manhwa**: tick chapters in one manhwa, go back, tick chapters in another, then read them all together.
 - **Remembers your place**: Continue reading picks up where you stopped.
 - **Covers**: uses a `cover.png` / `cover.jpg` in the manhwa's folder, or the first page of chapter 1, or a picture you choose with **Change cover**.
+- **Covers found online**: a manhwa with no cover gets one from AniList by its name, automatically (switch off in the menu) or with **Find online**.
 - **Send and Receive**: share manhwa with a friend's phone over Wi-Fi or hotspot. No internet needed.
 - **Light and Dark theme**: switch in the menu (⋮) on the home screen.
 - **About** page in the same menu.
@@ -76,6 +77,7 @@ To run a new build yourself: **Actions**, **Build APK**, **Run workflow**. Every
 
 - Kotlin and Jetpack Compose (Material 3), minimum Android 5.0 (API 21).
 - Pages are drawn with Android's built-in `PdfRenderer`.
+- Cover lookup sends only the cleaned-up manhwa name to AniList (`graphql.anilist.co`) and saves the picture on the phone. After that, reading is offline.
 - Folders are opened through Android's folder picker, so no storage permission is needed.
 - Phone-to-phone sharing uses Android's local network discovery and a plain connection on port 45454. Only PDF and picture files are accepted, and only after the receiver taps Accept.
 - Release builds are signed with the fixed key in `app/nux.jks`, so each new APK installs over the previous one. That key is for personal use. Make a private key of your own before publishing the app anywhere.
